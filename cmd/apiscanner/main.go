@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+
+	"apiscanner/internal/sast"
 )
 
 // хранит параметры запуска сканера
@@ -73,11 +75,13 @@ func main() {
 
 }
 
-// Временные заглушки
 func runSAST(path string) {
 	fmt.Printf("Запуск SAST сканирования в директории: %s\n", path)
+	sast.Run(path)
+	fmt.Println("\n SAST сканирование завершено.")
 }
 
+// Временная заглушка
 func runDAST(targetURL string) {
 	fmt.Printf("[+] Запуск DAST сканирования целевого URL: %s\n", targetURL)
 }
