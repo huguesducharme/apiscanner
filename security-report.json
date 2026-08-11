@@ -1,0 +1,28 @@
+{
+  "vulnerabilities": [
+    {
+      "type": "Generic Secret / API Key",
+      "location": "internal\\sast\\secrets.go:24",
+      "description": "Найден захардкоженный секрет",
+      "severity": "HIGH"
+    },
+    {
+      "type": "Security Misconfiguration",
+      "location": "Headers",
+      "description": "Отсутствует заголовок Strict-Transport-Security (Принудительный HTTPS (HSTS))",
+      "severity": "LOW"
+    },
+    {
+      "type": "Security Misconfiguration",
+      "location": "Headers",
+      "description": "Отсутствует заголовок X-Frame-Options (Защита от Clickjacking)",
+      "severity": "LOW"
+    },
+    {
+      "type": "Missing Rate Limit",
+      "location": "https://jsonplaceholder.typicode.com/posts/1",
+      "description": "Сервер обработал все 15 запросов без блокировки (риск DoS/Брутфорса)",
+      "severity": "MEDIUM"
+    }
+  ]
+}

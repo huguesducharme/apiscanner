@@ -1,6 +1,7 @@
 package sast
 
 import (
+	"apiscanner/internal/report"
 	"bufio"
 	"fmt"
 	"os"
@@ -41,14 +42,14 @@ type Finding struct {
 	Match string // Сам найденный кусок текста
 }
 
-func Run(targetDir string) {
+func Run(targetDir string, rep *report.Report) {
 	filesChan := make(chan string, 100) // Очередь файлов для сканирования
 	var wg sync.WaitGroup               // Синхронизатор для ожидания всех воркеров
 
 	// создаю 5 горутин
 	for i := 0; i < 5; i++ {
 		wg.Add(1)
-		go worker(filesChan, &wg)
+		go worker(filesChan, &wg, rep)
 	}
 
 	// обход директории и отправка файлов в очередь
@@ -113,17 +114,17 @@ func Run(targetDir string) {
 	wg.Wait()
 }
 
-func worker(filesChan <-chan string, wg *sync.WaitGroup) {
+func worker(filesChan <-chan string, wg *sync.WaitGroup, rep *report.Report) {
 	defer wg.Done()
 
 	// Воркер берет файлы из канала, пока канал не закроют
 	for path := range filesChan {
-		scanFile(path)
+		scanFile(path, rep)
 	}
 }
 
 // открывает файл, читает построчно и ищет регулярки
-func scanFile(path string) {
+func scanFile(path string, rep *report.Report) {
 	file, err := os.Open(path)
 	if err != nil {
 		return
@@ -140,7 +141,12 @@ func scanFile(path string) {
 		// Прогон строки через регулярки
 		for ruleName, regex := range RegexRules {
 			if regex.MatchString(lineText) {
-				fmt.Printf("Найден %s!\n  Файл: %s:%d\n  Строка: %s\n\n", ruleName, path, lineNumber, lineText)
+				rep.Add(report.Vulnerability{
+					Type:        ruleName,
+					Location:    fmt.Sprintf("%s:%d", path, lineNumber),
+					Description: "Найден захардкоженный секрет",
+					Severity:    "HIGH",
+				})
 			}
 		}
 		lineNumber++

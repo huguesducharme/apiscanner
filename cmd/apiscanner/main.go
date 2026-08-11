@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"apiscanner/internal/dast"
+	"apiscanner/internal/report"
 	"apiscanner/internal/sast"
 )
 
@@ -52,6 +53,8 @@ func main() {
 
 	flag.Parse()
 
+	rep := report.New()
+
 	// ф-ия проверки
 	if err := validateConfig(cfg); err != nil {
 		fmt.Printf("[!] Ошибка аргументов: %v\n\n", err)
@@ -66,24 +69,29 @@ func main() {
 	// запуск модулей
 	switch cfg.Mode {
 	case "sast":
-		runSAST(cfg.Path)
+		runSAST(cfg.Path, rep)
 	case "dast":
-		runDAST(cfg.TargetURL)
+		runDAST(cfg.TargetURL, rep)
 	case "all":
-		runSAST(cfg.Path)
-		runDAST(cfg.TargetURL)
+		runSAST(cfg.Path, rep)
+		runDAST(cfg.TargetURL, rep)
+	}
+	rep.PrintTable()
+	if cfg.OutputFile != "" {
+		rep.ExportJSON(cfg.OutputFile)
+		fmt.Println("Файл успешно сохранен")
 	}
 
 }
 
-func runSAST(path string) {
+func runSAST(path string, rep *report.Report) {
 	fmt.Printf("Запуск SAST сканирования в директории: %s\n", path)
-	sast.Run(path)
+	sast.Run(path, rep)
 	fmt.Println("\n SAST сканирование завершено.")
 }
 
-func runDAST(targetURL string) {
+func runDAST(targetURL string, rep *report.Report) {
 	fmt.Printf("Запуск DAST сканирования целевого URL: %s\n", targetURL)
-	dast.Run(targetURL)
+	dast.Run(targetURL, rep)
 	fmt.Println("\n DAST сканирование завершено.")
 }

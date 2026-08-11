@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"sync"
 	"time"
+
+	"apiscanner/internal/report"
 )
 
 // описывает найденную проблему в API
@@ -15,7 +17,7 @@ type DastFinding struct {
 	Severty     string // Уровень риска: High, Medium, Low
 }
 
-func Run(targetURL string) {
+func Run(targetURL string, rep *report.Report) {
 	fmt.Printf("Подключение к целевому URL: %s\n\n", targetURL)
 
 	client := &http.Client{
@@ -40,13 +42,13 @@ func Run(targetURL string) {
 	fmt.Printf("Сервер ответил. Код состояния: %d\n\n", resp.StatusCode)
 
 	//запуск тестов
-	checkSecurityHeaders(resp.Header)
-	checkRateLimit(client, targetURL)
-	checkIDOR(client, targetURL)
+	checkSecurityHeaders(resp.Header, rep)
+	checkRateLimit(client, targetURL, rep)
+	checkIDOR(client, targetURL, rep)
 }
 
 // проверяет наличие защитных заголовков в ответе сервера
-func checkSecurityHeaders(headers http.Header) {
+func checkSecurityHeaders(headers http.Header, rep *report.Report) {
 	fmt.Println("Проверка заголовков безопасности...")
 
 	// список критичных заголовков, которые должны быть у безопасного API
@@ -58,20 +60,30 @@ func checkSecurityHeaders(headers http.Header) {
 
 	for header, desc := range importantHeaders {
 		if headers.Get(header) == "" {
-			fmt.Printf("Отсутствует заголовок %s! (%s)\n", header, desc)
+			rep.Add(report.Vulnerability{
+				Type:        "Security Misconfiguration",
+				Location:    "Headers",
+				Description: fmt.Sprintf("Отсутствует заголовок %s (%s)", header, desc),
+				Severity:    "LOW",
+			})
 		}
 	}
 
 	// проверка CORS
 	corsHeader := headers.Get("Access-Control-Allow-Origin")
 	if corsHeader == "*" {
-		fmt.Println("Небезопасный CORS! Заголовок Access-Control-Allow-Origin равен '*' (доступен любому сайту).")
+		rep.Add(report.Vulnerability{
+			Type:        "Insecure CORS",
+			Location:    "Headers",
+			Description: "Заголовок Access-Control-Allow-Origin равен '*'",
+			Severity:    "MEDIUM",
+		})
 	}
 	fmt.Println()
 }
 
 // симулирует брутфорс/DoS атаку, отправляя 15 быстрых запросов
-func checkRateLimit(client *http.Client, targetURL string) {
+func checkRateLimit(client *http.Client, targetURL string, rep *report.Report) {
 	fmt.Println("Проверка Rate Limiting...")
 
 	// флаг изначально false, если хотя бы один запрос будет заблокирован сервером -> true
@@ -108,13 +120,18 @@ func checkRateLimit(client *http.Client, targetURL string) {
 	if rateLimitTriggered {
 		fmt.Println("Rate Limiting работает корректно (DoS/Брутфорса не будет :( )")
 	} else {
-		fmt.Println("Rate Limiting не обнаружен! Сервер обработал все 15 запросов без блокировки (риск DoS/Брутфорса)")
+		rep.Add(report.Vulnerability{
+			Type:        "Missing Rate Limit",
+			Location:    targetURL,
+			Description: "Сервер обработал все 15 запросов без блокировки (риск DoS/Брутфорса)",
+			Severity:    "MEDIUM",
+		})
 	}
 	fmt.Println()
 }
 
 // проверка на Insecure Direct Object Reference
-func checkIDOR(client *http.Client, targetURL string) {
+func checkIDOR(client *http.Client, targetURL string, rep *report.Report) {
 	fmt.Println("Проверкаv IDOR (Broken Object Level Authorization)...")
 
 	// ищем цифру в конце URL
@@ -145,8 +162,12 @@ func checkIDOR(client *http.Client, targetURL string) {
 
 	// Анализ ответов от сервера
 	if resp.StatusCode == 200 {
-		fmt.Printf("Возможный IDOR! Сервер отдал данные (200 OK) по адресу %s.\n", testURL)
-		fmt.Println("        -> Убедитесь, что этот эндпоинт не сливает чужие приватные данные без токена авторизации.")
+		rep.Add(report.Vulnerability{
+			Type:        "BOLA/IDOR",
+			Location:    testURL,
+			Description: "Возможный IDOR! Сервер отдал данные (200 OK) по чужому ID",
+			Severity:    "HIGH",
+		})
 	} else if resp.StatusCode == 401 || resp.StatusCode == 403 {
 		fmt.Printf("IDOR маловероятен: сервер запретил доступ к %s (код %d).\n", testURL, resp.StatusCode)
 	} else if resp.StatusCode == 404 {
