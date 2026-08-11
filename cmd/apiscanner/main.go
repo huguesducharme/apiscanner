@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"apiscanner/internal/dast"
 	"apiscanner/internal/sast"
 )
 
@@ -81,7 +82,8 @@ func runSAST(path string) {
 	fmt.Println("\n SAST сканирование завершено.")
 }
 
-// Временная заглушка
 func runDAST(targetURL string) {
-	fmt.Printf("[+] Запуск DAST сканирования целевого URL: %s\n", targetURL)
+	fmt.Printf("Запуск DAST сканирования целевого URL: %s\n", targetURL)
+	dast.Run(targetURL)
+	fmt.Println("\n DAST сканирование завершено.")
 }
